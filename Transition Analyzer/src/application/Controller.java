@@ -68,20 +68,12 @@ public class Controller {
 	private int numberOfSamplesPerColumn;
 	@FXML
 	private Slider slider;
-	@FXML
-	private Slider speedslider;
-	@FXML
-	private Slider volslider;
-	@FXML 
-	private Button pause;
 	private MediaPlayer mediaPlayer;
 	private VideoCapture capture;
 	private ScheduledExecutorService timer;
 	
 	@FXML
 	private void initialize() {
-		// Optional: You should modify the logic so that the user can change these values
-		// You may also do some experiments with different values
 		width = 64;
 		height = 64;
 		sampleRate = 8000;
@@ -110,7 +102,7 @@ public class Controller {
 		// Rajan: The following code block was provided by the Oracle Java Docs for JFileChooser with slight modification
 	    JFileChooser chooser = new JFileChooser();
 	    FileNameExtensionFilter filter = new FileNameExtensionFilter(
-	        "jpg, gif, png, mp4, mov, wav, jpeg", "jpg", "gif", "png", "mp4", "mov", "wav", "jpeg");
+	        "mp4, mov, wav", "mp4", "mov", "wav");
 	    chooser.setFileFilter(filter);
 	    int returnVal = chooser.showOpenDialog(null);
 	    if(returnVal == JFileChooser.APPROVE_OPTION) {
@@ -118,26 +110,15 @@ public class Controller {
 	            chooser.getSelectedFile().getName());
 	    }
 	    
-	    String file = chooser.getSelectedFile().getName(); // rajan: name of video
-	    String filetype = file.substring(file.lastIndexOf("."),file.length()); // rajan: name of extension (.jpg, .mp4, etc.)
+	    String file = chooser.getSelectedFile().getName(); // name of video
+	    String filetype = file.substring(file.lastIndexOf("."),file.length()); // name of extension (.jpg, .mp4, etc.)
 
 	    // Rajan: ALL SELECTED FILES MUST BE IN RESOURCES FOLDER TO WORK!!!
 	    // rajan : below code decides whether picture is image or video. issue to fix later: are .gif files images or videos?
-	    if(filetype.equals(".mp4") || filetype.equals(".mov") || filetype.equals(".wav") || filetype.equals(".gif")) {
 			capture = new VideoCapture("resources/" + file); // open video file
 			if (capture.isOpened()) { // open successfully
 				createFrameGrabber();
 			} 
-	    }
-	    if(filetype.equals(".png") || filetype.equals(".jpg") || filetype.equals(".jpeg")) {
-			final String imageFilename = "resources/" + file;
-			image = Imgcodecs.imread(imageFilename);
-			imageView.setImage(Utilities.mat2Image(image)); 
-	    }
-		// You don't have to understand how mat2Image() works. 
-		// In short, it converts the image from the Mat format to the Image format
-		// The Mat format is used by the opencv library, and the Image format is used by JavaFX
-		// BTW, you should be able to explain briefly what opencv and JavaFX are after finishing this assignment
 	}
 	protected void createFrameGrabber() throws InterruptedException {
 		 if (capture != null && capture.isOpened()) { // the video must be open
@@ -171,64 +152,5 @@ public class Controller {
 			 timer.scheduleAtFixedRate(frameGrabber, 0, Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
 		 }
 		}
-	@FXML
-	protected void pause(ActionEvent event) throws InterruptedException{ // pause/play feature
-		if(pl) {
-		pause.setText("Play");
-		}
-		if(!pl) {
-			pause.setText("Pause");
-		}
-		pl = !pl;
-	}
 
-	@FXML
-	protected void playImage(ActionEvent event) throws LineUnavailableException {
-		// This method "plays" the image opened by the user
-		// You should modify the logic so that it plays a video rather than an image
-		if (image != null) {
-			flag = 1;			
-			// convert the image from RGB to grayscale
-			Mat grayImage = new Mat();
-			Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
-			
-			// resize the image
-			Mat resizedImage = new Mat();
-			Imgproc.resize(grayImage, resizedImage, new Size(width, height));
-			
-			// quantization
-			double[][] roundedImage = new double[resizedImage.rows()][resizedImage.cols()];
-			for (int row = 0; row < resizedImage.rows(); row++) {
-				for (int col = 0; col < resizedImage.cols(); col++) {
-					roundedImage[row][col] = (double)Math.floor(resizedImage.get(row, col)[0]/numberOfQuantizionLevels) / numberOfQuantizionLevels;
-				}
-			}
-			
-			// I used an AudioFormat object and a SourceDataLine object to perform audio output. Feel free to try other options
-	        AudioFormat audioFormat = new AudioFormat(sampleRate, sampleSizeInBits, numberOfChannels, true, true);
-            SourceDataLine sourceDataLine = AudioSystem.getSourceDataLine(audioFormat);
-            sourceDataLine.open(audioFormat, sampleRate);
-            sourceDataLine.start();
-            for (int col = 0; col < width; col++) {
-            	byte[] audioBuffer = new byte[numberOfSamplesPerColumn];
-            	for (int t = 1; t <= numberOfSamplesPerColumn; t++) {
-            		double signal = 0;
-                	for (int row = 0; row < height; row++) {
-                		int m = height - row - 1; // Be sure you understand why it is height rather width, and why we subtract 1 
-                		int time = t + col * numberOfSamplesPerColumn;
-                		double ss = Math.sin(2 * Math.PI * freq[m] * (double)time/sampleRate);
-                		signal += roundedImage[row][col] * ss;
-                	}
-                	double normalizedSignal = signal / height; // signal: [-height, height];  normalizedSignal: [-1, 1]
-                	audioBuffer[t-1] = (byte) (normalizedSignal*0x7F); // Be sure you understand what the weird number 0x7F is for
-            	}
-            	sourceDataLine.write(audioBuffer, 0, numberOfSamplesPerColumn);
-            }
-            sourceDataLine.drain();
-            sourceDataLine.close();
-            flag = 0;
-		} else {
-			System.out.println("No selected image.");
-		}
-	} 
 }
