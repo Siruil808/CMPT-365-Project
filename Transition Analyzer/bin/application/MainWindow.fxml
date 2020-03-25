@@ -16,11 +16,11 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Text?>
 
-<BorderPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="495.0" prefWidth="600.0" style="-fx-background-color: #e6f7ff; " xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.Controller">
+<BorderPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="495.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.Controller" style="-fx-background-color: #e6f7ff; ">
    <top>
       <VBox style="-fx-background-color: #077761; ">
          <children>
-            <Text fill="#990000" strokeType="OUTSIDE" text="Final Project" textAlignment="CENTER" BorderPane.alignment="CENTER">
+            <Text fill="#990000" strokeType="OUTSIDE" text="Assignment 2" textAlignment="CENTER" BorderPane.alignment="CENTER">
                <VBox.margin>
                   <Insets left="250.0" />
                </VBox.margin>
@@ -32,13 +32,19 @@
       </VBox>   
    </top>
    <bottom>
-      <VBox prefHeight="150.0" prefWidth="600.0" style="-fx-background-color: #e6f2ff; " BorderPane.alignment="CENTER">
+      <VBox prefHeight="150.0" prefWidth="600.0" BorderPane.alignment="CENTER" style="-fx-background-color: #e6f2ff; " >
          <children>
             <HBox prefHeight="68.0" prefWidth="600.0">
                <children>
                   <Button mnemonicParsing="false" onAction="#openImage" prefHeight="40.0" prefWidth="100.0" text="Open">
                      <HBox.margin>
-                        <Insets left="100.0" top="5.0" />
+                        <Insets left="100.0" top="5.0"/>
+                     </HBox.margin>
+                  </Button>
+
+                  <Button fx:id="pause" style="-fx-background-color: #950505; " mnemonicParsing="false" onAction="#pause" prefHeight="40.0" prefWidth="100.0" text="Pause" textFill="black">
+                     <HBox.margin>
+                        <Insets left="55.0" top="5.0"/>
                      </HBox.margin>
                   </Button>
                </children>
@@ -54,7 +60,7 @@
    <center>
       <VBox>
          <children>
-            <ImageView fx:id="imageView" fitHeight="270.0" fitWidth="421.0" pickOnBounds="true" preserveRatio="true" style="-fx-effect: dropshadow(three-pass-box, black, 30, 0.5, 0, 0)" BorderPane.alignment="CENTER">
+            <ImageView fx:id="imageView" fitHeight="270.0" fitWidth="421.0" pickOnBounds="true" preserveRatio="true" BorderPane.alignment="CENTER" style="-fx-effect: dropshadow(three-pass-box, black, 30, 0.5, 0, 0)">
                <VBox.margin>
                   <Insets left="20.0" top="20.0" />
                </VBox.margin>
@@ -68,6 +74,29 @@
       </VBox>
    </center>
    <right>
-      <VBox style="-fx-background-color: #989898;  " />   
+      <VBox style="-fx-background-color: #989898;  ">
+         <children>
+            <Text text="Volume" strokeType="OUTSIDE" strokeWidth="3.0">
+               <VBox.margin>
+                  <Insets left="10.0" top="120.0" />
+               </VBox.margin>
+            </Text>
+            <Slider fx:id="volslider">
+               <VBox.margin>
+                  <Insets left="10.0" top="10.0" />
+               </VBox.margin>
+            </Slider>
+            <Text text="Speed" strokeType="OUTSIDE" strokeWidth="3.0">
+               <VBox.margin>
+                  <Insets left="10.0" top="10.0" />
+               </VBox.margin>
+            </Text>
+            <Slider fx:id="speedslider">
+               <VBox.margin>
+                  <Insets left="10.0" top="10.0" />
+               </VBox.margin>
+            </Slider>
+         </children>
+      </VBox>   
    </right>
 </BorderPane>
