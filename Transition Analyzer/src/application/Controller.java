@@ -1,5 +1,11 @@
 package application;
 
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;// matrix
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.videoio.VideoCapture;
+import org.opencv.videoio.Videoio;
 import java.io.*;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -53,22 +59,20 @@ import utilities.Utilities;
 
 import java.util.ArrayList;
 
+
 public class Controller {
 	
 	@FXML
 	private ImageView imageView; // the image display window in the GUI
 
-	private Mat image;
-	private int flag = 0;
-	private boolean pl = true;
-	private int width;
-	private int height;
-	private int sampleRate; // sampling frequency
-	private int sampleSizeInBits;
-	private int numberOfChannels;
-	private double[] freq; // frequencies for each particular row
-	private int numberOfQuantizionLevels;
-	private int numberOfSamplesPerColumn;
+//	private int width;
+//	private int height;
+//	private int sampleRate; // sampling frequency
+//	private int sampleSizeInBits;
+//	private int numberOfChannels;
+//	private double[] freq; // frequencies for each particular row
+//	private int numberOfQuantizionLevels;
+//	private int numberOfSamplesPerColumn;
 	@FXML
 	private Slider slider;
 	@FXML
@@ -78,126 +82,96 @@ public class Controller {
 	@FXML 
 	private Button pause;
 	private MediaPlayer mediaPlayer;
-	private VideoCapture capture;
 	private ScheduledExecutorService timer;
-	
-	private int histBin;
-	private int totalFrame ; 
-	private static int frameNumber;	
 
+	
+	private Mat image;
+	private int flag = 0;
+	private boolean pl = true;
+	private int histBin;
+	private int totalFrame ; //there must exist atleast 1 frame -> which is an image.
+	private static int frameNumber; // The counter uses to count frames
+	private VideoCapture capture; 
+	
 	private Mat colSTI; // MAT for copying pixel STI (column)
 	private Mat rowSTI; // MAT for copying pixel STI (row)
 	private Mat colHistSTI;// MAT for Histogram pixel STI (column)
 	private Mat rowHistSTI; // MAT for Histogram pixel STI (row)
 	private ArrayList<Mat> frames;//storing all the frames(after chromaticity) for later use (HISTOGRAM)
-	private boolean newCP;	
+	private boolean newCP;
+	@FXML 
 
-	@FXML
-	private void initialize() {
-		// Optional: You should modify the logic so that the user can change these values
-		// You may also do some experiments with different values
-		width = 64;
-		height = 64;
-		sampleRate = 8000;
-		sampleSizeInBits = 8;
-		numberOfChannels = 1;
+	private String getImageFilename() {
+		// This method should return the filename of the image to be played
+		// You should insert your code here to allow user to select the file
+		FileChooser fc = new FileChooser();
 		
-		numberOfQuantizionLevels = 16;
-		
-		numberOfSamplesPerColumn = 500;
-		
-		// assign frequencies for each particular row
-		freq = new double[height]; // Be sure you understand why it is height rather than width
-		freq[height/2-1] = 440.0; // 440KHz - Sound of A (La)
-		for (int m = height/2; m < height; m++) {
-			freq[m] = freq[m-1] * Math.pow(2, 1.0/12.0); 
+		File selectedFile = fc.showOpenDialog(null);
+		if(selectedFile != null) {
+			String fileName = selectedFile.getAbsolutePath();//gets the absolute path of the file selected.
+			return fileName;
 		}
-		for (int m = height/2-2; m >=0; m--) {
-			freq[m] = freq[m+1] * Math.pow(2, -1.0/12.0); 
+		else {
+			System.out.println("File Selection Fail");//file cannot be opened.
+			return null;
 		}
-
 	}
 	@FXML
 	protected void openImage(ActionEvent event) throws InterruptedException {
 		// This method opens an image and display it using the GUI
 		// You should modify the logic so that it opens and displays a video
-		// Rajan: The following code block was provided by the Oracle Java Docs for JFileChooser with slight modification
-	    JFileChooser chooser = new JFileChooser();
-	    FileNameExtensionFilter filter = new FileNameExtensionFilter(
-	        "jpg, gif, png, mp4, mov, wav, jpeg", "jpg", "gif", "png", "mp4", "mov", "wav", "jpeg", "avi");
-	    chooser.setFileFilter(filter);
-	    int returnVal = chooser.showOpenDialog(null);
-	    if(returnVal == JFileChooser.APPROVE_OPTION) {
-	       System.out.println("You chose to open this file: " +
-	            chooser.getSelectedFile().getName());
-	    }
-	    
-	    String file = chooser.getSelectedFile().getName(); // rajan: name of video
-	    String filetype = file.substring(file.lastIndexOf("."),file.length()); // rajan: name of extension (.jpg, .mp4, etc.)
-
-	    // Rajan: ALL SELECTED FILES MUST BE IN RESOURCES FOLDER TO WORK!!!
-	    // rajan : below code decides whether picture is image or video. issue to fix later: are .gif files images or videos?
-	    if(filetype.equals(".mp4") || filetype.equals(".mov") || filetype.equals(".wav") || filetype.equals(".gif")) {
-			capture = new VideoCapture("resources/" + file); // open video file
-			if (capture.isOpened()) { // open successfully
+		final String imageFilename = getImageFilename();
+		String extension = imageFilename.substring(imageFilename.lastIndexOf("."),imageFilename.length()); 
+		//checks file extension to see if it is a video. ( included the top 5 extension for videos
+		if (extension.equals(".mp4") || extension.equals(".wmv") || extension.equals(".mov") || extension.equals(".mpeg") || extension.equals(".avi")) {
+			capture = new VideoCapture(imageFilename);//open video file
+			if(capture.isOpened()) {//open successfully
+				newCP=true;
 				createFrameGrabber();
-			} 
-	    }
-	    if(filetype.equals(".png") || filetype.equals(".jpg") || filetype.equals(".jpeg")) {
-			final String imageFilename = "resources/" + file;
-			image = Imgcodecs.imread(imageFilename);
-			imageView.setImage(Utilities.mat2Image(image)); 
-	    }
-		// You don't have to understand how mat2Image() works. 
-		// In short, it converts the image from the Mat format to the Image format
-		// The Mat format is used by the opencv library, and the Image format is used by JavaFX
-		// BTW, you should be able to explain briefly what opencv and JavaFX are after finishing this assignment
-	}
-	protected void createFrameGrabber() throws InterruptedException {
-		 if (capture != null && capture.isOpened()) { // the video must be open
-			 System.out.println("Video open"); // Rajan: Check if the video has been opened
-			 double framePerSecond = capture.get(Videoio.CAP_PROP_FPS);
-			 // create a runnable to fetch new frames periodically
-			 Runnable frameGrabber = new Runnable() {
-				 @Override
-				 public void run() {
-					 Mat frame = new Mat();
-					 if (capture.read(frame)) { // decode successfully
-							 Image im = Utilities.mat2Image(frame);
-							 Utilities.onFXThread(imageView.imageProperty(), im);
-							 image = frame;
-							 double currentFrameNumber = capture.get(Videoio.CAP_PROP_POS_FRAMES); // current frame number
-							 double totalFrameCount = capture.get(Videoio.CAP_PROP_FRAME_COUNT);   // total frame count
-							 slider.setValue(currentFrameNumber / totalFrameCount * (slider.getMax() - slider.getMin())); //this sets slider position
-					 } 
-					 else { // reach the end of the video
-						 capture.set(Videoio.CAP_PROP_POS_FRAMES, 0);
-					 }
-				 }
-			 };
-			 // terminate the timer if it is running
-			 if (timer != null && !timer.isShutdown()) {
-				 timer.shutdown();
-				 timer.awaitTermination(Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
-			 }
-			 // run the frame grabber
-			 timer = Executors.newSingleThreadScheduledExecutor();
-			 timer.scheduleAtFixedRate(frameGrabber, 0, Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
-		 }
+				histSTI(null);
+			}
+			else
+				System.out.println("capture is not opened");
 		}
+		else
+			System.out.println("This filetype is not supported, This is a type "+extension);
+	}
+//	protected void openImage(ActionEvent event) throws InterruptedException {
+//	// This method opens an image and display it using the GUI
+//	// You should modify the logic so that it opens and displays a video
+//	// Rajan: The following code block was provided by the Oracle Java Docs for JFileChooser with slight modification
+//    JFileChooser chooser = new JFileChooser();
+//    FileNameExtensionFilter filter = new FileNameExtensionFilter(
+//        "jpg, gif, png, mp4, mov, wav, jpeg", "jpg", "gif", "png", "mp4", "mov", "wav", "jpeg", "avi");
+//    chooser.setFileFilter(filter);
+//    int returnVal = chooser.showOpenDialog(null);
+//    if(returnVal == JFileChooser.APPROVE_OPTION) {
+//       System.out.println("You chose to open this file: " +
+//            chooser.getSelectedFile().getName());
+//    }
+//    
+//    String file = chooser.getSelectedFile().getName(); // rajan: name of video
+//    String filetype = file.substring(file.lastIndexOf("."),file.length()); // rajan: name of extension (.jpg, .mp4, etc.)
+//
+//    // Rajan: ALL SELECTED FILES MUST BE IN RESOURCES FOLDER TO WORK!!!
+//    // rajan : below code decides whether picture is image or video. issue to fix later: are .gif files images or videos?
+//    if(filetype.equals(".mp4") || filetype.equals(".mov") || filetype.equals(".wav") || filetype.equals(".gif")) {
+//		capture = new VideoCapture("resources/" + file); // open video file
+//		if (capture.isOpened()) { // open successfully
+//			createFrameGrabber();
+//		} 
+//    }
+//    if(filetype.equals(".png") || filetype.equals(".jpg") || filetype.equals(".jpeg")) {
+//		final String imageFilename = "resources/" + file;
+//		image = Imgcodecs.imread(imageFilename);
+//		imageView.setImage(Utilities.mat2Image(image)); 
+//    }
+//	// You don't have to understand how mat2Image() works. 
+//	// In short, it converts the image from the Mat format to the Image format
+//	// The Mat format is used by the opencv library, and the Image format is used by JavaFX
+//	// BTW, you should be able to explain briefly what opencv and JavaFX are after finishing this assignment
+//}
 	@FXML
-	protected void pause(ActionEvent event) throws InterruptedException{ // pause/play feature
-		if(pl) {
-		pause.setText("Play");
-		}
-		if(!pl) {
-			pause.setText("Pause");
-		}
-		pl = !pl;
-	}
-///////////////////////	
-	//set center column, raw; and histogram column, raw
-	@FXML 
 	protected void centerCOL_STI(ActionEvent event){
 		imageView.setImage(Utilities.mat2Image(colSTI));// Suppose to display a center column STI
 	}
@@ -213,7 +187,7 @@ public class Controller {
 	protected void histCOL_STI(ActionEvent event) {
 		imageView.setImage(Utilities.mat2Image(colHistSTI)); // Suppose to display a Histogram row STI
 	}
-	
+
 	protected void copyPixel(ActionEvent event) {
 		if (image != null) {
 			//filling matrix for center column STI
@@ -239,17 +213,12 @@ public class Controller {
 		}
 		else
 			System.out.println("No image is selected");
-		}	
-//Quality of color; (the color plane)
+		}
 	protected void chromaticity(ActionEvent event) {//create the chromaticity image for fame and call the histogram function		
 		if(frameNumber == 0)
 			frames = new ArrayList<>();
 		if (image != null) {
-			Mat chrom = new Mat (image.rows(),image.cols(),CvType.CV_64FC2); // Mat object that stores the chromaticity values for this frame 
-			//convert the mat from CV_8UC3/CV_8UC2 to CV_64FC3/CV_64FC2 
-			//CV_xxTCn : xx is the number of bit, 
-			//T is the type (F-float , S-signedInterger, U-unsignedInterger)
-			//C means channel and n is the number of channels.
+			Mat chrom = new Mat (image.rows(),image.cols(),CvType.CV_64FC2); 
 			image.convertTo(image, CvType.CV_64FC3);
 			
 			//convert all rgb (from colSTI (3channel) in to an array)
@@ -300,6 +269,7 @@ public class Controller {
 		else
 			System.out.println("No image is selected");
 	}
+	
 	protected void diffIntersection(ArrayList<double[][]> Histogram , ArrayList<Double> I) {// array of scalar I
 		for(int i = 0 ; i < totalFrame - 1 ; i++) {//going through all the frames
 			double[][] previous = Histogram.get(i);
@@ -311,7 +281,8 @@ public class Controller {
 					 sumI+= Math.min(previous[row][col], current[row][col]);
 			I.add(sumI);
 		}
-	}	
+	}
+	//The function that creates histograms
 	protected void createHistogram(ArrayList<double[][]> Histogram , Mat chrom , int n) { // histogram is colHistogram or rowHistogram , sti should be chromaticity Mat
 		// n = size of data ~ number of image rows
 		histBin = (int)Math.floor(1+((double)Math.log(n)/(double)Math.log(2))); // Sturge's Rule - > N = 1+log2(n)
@@ -344,63 +315,154 @@ public class Controller {
 				hist[i][j]= hist[i][j]/sum;
 		
 			Histogram.add(hist);// Adding hist object to array list histogram
-	}	
-////////////////////	
-	
-	@FXML
-	protected void playImage(ActionEvent event) throws LineUnavailableException {
-		// This method "plays" the image opened by the user
-		// You should modify the logic so that it plays a video rather than an image
-		if (image != null) {
-			flag = 1;			
-			// convert the image from RGB to grayscale
-			Mat grayImage = new Mat();
-			Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
-			
-			// resize the image
-			Mat resizedImage = new Mat();
-			Imgproc.resize(grayImage, resizedImage, new Size(width, height));
-			
-			// quantization
-			double[][] roundedImage = new double[resizedImage.rows()][resizedImage.cols()];
-			for (int row = 0; row < resizedImage.rows(); row++) {
-				for (int col = 0; col < resizedImage.cols(); col++) {
-					roundedImage[row][col] = (double)Math.floor(resizedImage.get(row, col)[0]/numberOfQuantizionLevels) / numberOfQuantizionLevels;
+	}
+	//The function that decompose the video in to different frames
+	protected void createFrameGrabber() throws InterruptedException {
+		frameNumber = 0;
+		if(capture != null && capture.isOpened()) {//the video must be opened
+			double framePerSecond = capture.get(Videoio.CAP_PROP_FPS);
+			totalFrame = (int) Math.round(capture.get(Videoio.CAP_PROP_FRAME_COUNT));
+			//create a runnable to fetch new frames periodically
+			Runnable frameGrabber = new Runnable() {
+				@Override
+				public void run() {
+					Mat frame = new Mat();
+					if (capture.read(frame)) {//decode successfully
+						Image im = Utilities.mat2Image(frame);
+						Utilities.onFXThread(imageView.imageProperty(), im);
+							if(frameNumber == 0) {
+								image = frame;
+							}
+							copyPixel(null);
+							chromaticity(null);
+							image = frame;
+							frameNumber++;
+							
+						}
+					else {capture.release();} //reach the end of the video
 				}
+			};
+			//loop through all the frames avliable for this video.
+			for(int i = 0 ; i < totalFrame ; i++)
+				frameGrabber.run();
+			 // terminate the timer if it is running
+			if (timer != null && !timer.isShutdown()) {
+				timer.shutdown();
+				timer.awaitTermination(Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
+			}
+		 // run the frame grabber
+				timer = Executors.newSingleThreadScheduledExecutor();
+				timer.scheduleAtFixedRate(frameGrabber, 0, Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
+		}
+	}
+//	protected void createFrameGrabber() throws InterruptedException {
+//	frameNumber = 0;
+//	 if (capture != null && capture.isOpened()) { // the video must be open
+//		 System.out.println("Video open"); // Rajan: Check if the video has been opened
+//		 double framePerSecond = capture.get(Videoio.CAP_PROP_FPS);
+//		 //double totalFrameCount = capture.get(Videoio.CAP_PROP_FRAME_COUNT);
+//		 // create a runnable to fetch new frames periodically
+//		 Runnable frameGrabber = new Runnable() {
+//			 @Override
+//			 public void run() {
+//				 Mat frame = new Mat();
+//				 if (capture.read(frame)) { // decode successfully
+//					 if(frameNumber == 0) {
+//							image = frame;
+//						}
+//						copyPixel(null);
+//						chromaticity(null);
+//						//image = frame;
+//						frameNumber++;	 
+//					 Image im = Utilities.mat2Image(frame);
+//					 Utilities.onFXThread(imageView.imageProperty(), im);
+//					 image = frame;
+//				     double currentFrameNumber = capture.get(Videoio.CAP_PROP_POS_FRAMES); // current frame number
+//					 double totalFrameCount = capture.get(Videoio.CAP_PROP_FRAME_COUNT);   // total frame count
+//				     slider.setValue(currentFrameNumber / totalFrameCount * (slider.getMax() - slider.getMin())); //this sets slider position
+//				 } 
+//				 else { // reach the end of the video
+//					 capture.set(Videoio.CAP_PROP_POS_FRAMES, 0);
+//				 }
+//			 }
+//		 };
+//			for(int i = 0 ; i < totalFrame ; i++)
+//				frameGrabber.run();
+//		 // terminate the timer if it is running
+////		 if (timer != null && !timer.isShutdown()) {
+////			 timer.shutdown();
+////			 timer.awaitTermination(Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
+////	 }
+//		 // run the frame grabber
+////		 timer = Executors.newSingleThreadScheduledExecutor();
+////		 timer.scheduleAtFixedRate(frameGrabber, 0, Math.round(1000/framePerSecond), TimeUnit.MILLISECONDS);
+//	 }
+//	}
+	
+	//This function calculates the histogram STI
+	protected void histSTI(ActionEvent event){
+		ArrayList<ArrayList<Double>> col_I = new ArrayList<ArrayList<Double>>();
+		ArrayList<ArrayList<Double>> row_I = new ArrayList<ArrayList<Double>>();
+
+		// column STI
+		colHistSTI = new Mat (32,totalFrame,CvType.CV_8UC3);
+		for(int column = 0 ; column < 32; column++) {
+			ArrayList<Mat> frameColumns = new ArrayList<>();	//stores columns for each frame
+			
+			//convert frame to frame number of columns
+			for(int i = 0 ; i <totalFrame ; i++) {  //getting the same column for all frames
+				Mat resizedImage = new Mat();
+				Imgproc.resize(frames.get(i), resizedImage, new Size(32,32));
+				frameColumns.add(resizedImage.col(column));
+			}
+			//creating histogram for each frame column
+			ArrayList<double[][]> histogram = new ArrayList<>();
+			for(int i = 0 ; i< totalFrame ; i++) 
+				createHistogram(histogram , frameColumns.get(i), frameColumns.get(i).rows());
+
+			//calculating I for each column
+			ArrayList<Double> I = new ArrayList<>();
+			diffIntersection(histogram , I);				
+			col_I.add(I);//col_I will hold the I for the entire image after the loop.
+		}
+		//Filling in the image
+		for(int i = 0; i < col_I.size(); i++)
+			for(int j = 0 ; j < col_I.get(0).size() ; j++) {
+				double value = col_I.get(i).get(j) *255;
+				double [] data = {value,value,value};
+				colHistSTI.put(i, j, data);
+		}
+	
+		//row STI
+		rowHistSTI = new Mat (32,totalFrame,CvType.CV_8UC3);
+		for(int row = 0 ; row < 32; row++) {
+			ArrayList<Mat> frameRow = new ArrayList<>();	//stores columns for each frame
+			
+			//convert frame to frame number of columns
+			for(int i = 0 ; i <totalFrame ; i++) {  //getting the same column for all frames
+				Mat resizedImage = new Mat();
+				Imgproc.resize(frames.get(i), resizedImage, new Size(32,32));
+				frameRow.add(resizedImage.row(row));
 			}
 			
-			// I used an AudioFormat object and a SourceDataLine object to perform audio output. Feel free to try other options
-	        AudioFormat audioFormat = new AudioFormat(sampleRate, sampleSizeInBits, numberOfChannels, true, true);
-            SourceDataLine sourceDataLine = AudioSystem.getSourceDataLine(audioFormat);
-            sourceDataLine.open(audioFormat, sampleRate);
-            sourceDataLine.start();
-            for (int col = 0; col < width; col++) {
-            	byte[] audioBuffer = new byte[numberOfSamplesPerColumn];
-            	for (int t = 1; t <= numberOfSamplesPerColumn; t++) {
-            		double signal = 0;
-                	for (int row = 0; row < height; row++) {
-                		int m = height - row - 1; // Be sure you understand why it is height rather width, and why we subtract 1 
-                		int time = t + col * numberOfSamplesPerColumn;
-                		double ss = Math.sin(2 * Math.PI * freq[m] * (double)time/sampleRate);
-                		signal += roundedImage[row][col] * ss;
-                	}
-                	double normalizedSignal = signal / height; // signal: [-height, height];  normalizedSignal: [-1, 1]
-                	audioBuffer[t-1] = (byte) (normalizedSignal*0x7F); // Be sure you understand what the weird number 0x7F is for
-            	}
-            	sourceDataLine.write(audioBuffer, 0, numberOfSamplesPerColumn);
-            }
-            sourceDataLine.drain();
-            sourceDataLine.close();
-            flag = 0;
-		} else {
-			System.out.println("No selected image.");
-		}
-	} 
-}
+			//creating histogram for each frame column
+			ArrayList<double[][]> histogram = new ArrayList<>();
+			for(int i = 0 ; i< totalFrame ; i++)
+				createHistogram(histogram , frameRow.get(i),frameRow.get(i).cols());
+			
 
-//Removed the play image button from the .fxml
-//<Button style="-fx-background-color: #119911; " mnemonicParsing="false" onAction="#playImage" prefHeight="40.0" prefWidth="100.0" text="Play Sound" textFill="black">
-//<HBox.margin>
-//   <Insets left="55.0" top="5.0"/>
-//</HBox.margin>
-//</Button>
+			//calculating I for each column
+			ArrayList<Double> I = new ArrayList<>();
+			diffIntersection(histogram , I);
+			row_I.add(I);//col_I will hold the I for the entire image after the loop.
+			
+		}
+
+		for(int i = 0; i < row_I.size(); i++)
+			for(int j = 0 ; j < row_I.get(0).size() ; j++) {
+				double value = row_I.get(i).get(j) *255;
+				double [] data = {value,value,value};
+				rowHistSTI.put(i, j, data);
+			}
+	}
+}
